@@ -134,7 +134,8 @@ def list_screen(words_by_day: dict):
 
     st.markdown(
         "Uruchom trening z wybranego dnia. "
-        "Ostatni uruchamiany dzień jest podświetlony."
+        "Ostatni uruchamiany dzień jest podświetlony. "
+        "Aby uruchomić nowy dzień, zalicz 3 powtórzenia dnia poprzedniego. "
     )
 
     progress = load_progress()
