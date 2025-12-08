@@ -133,7 +133,7 @@ def list_screen(words_by_day: dict):
     st.title("Nauka czytania")
 
     st.markdown(
-        "Uruchom trening z wybranego dnia. Ostatni uruchamiany dzień został podświetlony"
+        "Uruchom trening z wybranego dnia. Ostatni uruchamiany dzień został podświetlony."
     )
 
     progress = load_progress()
@@ -152,71 +152,76 @@ def list_screen(words_by_day: dict):
             prev_key = str(dn_int - 1)
             can_play = progress.get(prev_key, 0) >= 3
 
-        # podświetlenie ostatnio otwieranego dnia
+        # podświetlenie ostatnio uruchamianego dnia – całego rzędu, delikatne tło
         is_last = (day_num == last_day)
-        row_bg = "background-color: #e6f3ff;" if is_last else ""
+        row_bg = "background-color: #edf7ff;" if is_last else ""
 
-        with st.container():
+        # cały wiersz jako jeden div – w środku dopiero kolumny
+        row_html = f"""
+        <div style="
+            {row_bg}
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        ">
+        """
+        st.markdown(row_html, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns([3, 4, 4])
+
+        with col1:
             st.markdown(
-                f"<div style='{row_bg} padding: 0.6rem; border-radius: 0.4rem;'>",
-                unsafe_allow_html=True,
+                f"**Dzień {day_num}**  \n"
+                f"Odtworzenia: **{count}**  \n"
+                f"Status: {status}"
             )
 
-            col1, col2, col3 = st.columns([3, 4, 4])
+        with col2:
+            st.write(", ".join(words))
 
-            with col1:
-                st.markdown(
-                    f"**Dzień {day_num}**  \n"
-                    f"Odtworzenia: **{count}**  \n"
-                    f"Status: {status}"
+        with col3:
+            # trzy małe przyciski w jednej linii (ikonki)
+            bcol1, bcol2, bcol3 = st.columns(3)
+
+            # START ▶️
+            with bcol1:
+                start_clicked = st.button(
+                    "▶️",
+                    key=f"start_{day_num}",
+                    help="Start treningu",
+                    disabled=not can_play,
                 )
+            if start_clicked and can_play:
+                st.session_state["view"] = "training"
+                st.session_state["training_day"] = day_num
+                st.session_state["last_day"] = day_num
+                st.rerun()
 
-            with col2:
-                st.write(", ".join(words))
+            # RESET 🔄
+            with bcol2:
+                reset_clicked = st.button(
+                    "🔄",
+                    key=f"reset_{day_num}",
+                    help="Reset licznika",
+                )
+            if reset_clicked:
+                progress[day_num] = 0
+                save_progress(progress)
+                st.rerun()
 
-            with col3:
-                # trzy małe przyciski w jednej linii (ikonki)
-                bcol1, bcol2, bcol3 = st.columns(3)
+            # RĘCZNE ZALICZENIE ✔️
+            with bcol3:
+                manual_clicked = st.button(
+                    "✔️",
+                    key=f"manual_{day_num}",
+                    help="Zalicz dzień ręcznie",
+                )
+            if manual_clicked:
+                progress[day_num] = max(progress.get(day_num, 0), 3)
+                save_progress(progress)
+                st.rerun()
 
-                # START ▶️
-                with bcol1:
-                    start_clicked = st.button(
-                        "▶️",
-                        key=f"start_{day_num}",
-                        help="Start treningu",
-                        disabled=not can_play,
-                    )
-                if start_clicked and can_play:
-                    st.session_state["view"] = "training"
-                    st.session_state["training_day"] = day_num
-                    st.session_state["last_day"] = day_num
-                    st.rerun()
-
-                # RESET 🔄
-                with bcol2:
-                    reset_clicked = st.button(
-                        "🔄",
-                        key=f"reset_{day_num}",
-                        help="Reset licznika",
-                    )
-                if reset_clicked:
-                    progress[day_num] = 0
-                    save_progress(progress)
-                    st.rerun()
-
-                # RĘCZNE ZALICZENIE ✔️
-                with bcol3:
-                    manual_clicked = st.button(
-                        "✔️",
-                        key=f"manual_{day_num}",
-                        help="Zalicz dzień ręcznie",
-                    )
-                if manual_clicked:
-                    progress[day_num] = max(progress.get(day_num, 0), 3)
-                    save_progress(progress)
-                    st.rerun()
-
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # --- GŁÓWNA FUNKCJA ---
@@ -226,6 +231,8 @@ def main():
 
     if "view" not in st.session_state:
         st.session_state["view"] = "list"
+    if "last_day" not in st.session_state:
+        st.session_state["last_day"] = None
 
     words_by_day = load_words()
     if not words_by_day:
