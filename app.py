@@ -130,11 +130,10 @@ def training_screen(day_num: str, words: list[str]):
 # --- EKRAN LISTY DNI ---
 
 def list_screen(words_by_day: dict):
-    st.title("Trening słownictwa")
+    st.title("Nauka czytania")
 
     st.markdown(
-        "Wybierz dzień, żeby uruchomić trening. "
-        "Po zakończeniu treningu wrócisz tutaj automatycznie."
+        "Uruchom trening z wybranego dnia. Ostatni uruchamiany dzień został podświetlony"
     )
 
     progress = load_progress()
