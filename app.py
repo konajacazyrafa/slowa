@@ -196,6 +196,12 @@ def list_screen(words_by_day: dict):
                     save_progress(progress)
                     st.rerun()
 
+                # Ręczne zaliczenie dnia
+                if st.button("Zalicz ręcznie", key=f"manual_{day_num}"):
+                    progress[day_num] = max(progress.get(day_num, 0), 3)
+                    save_progress(progress)
+                    st.rerun()
+
             st.markdown("</div>", unsafe_allow_html=True)
 
 
