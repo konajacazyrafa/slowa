@@ -7,12 +7,15 @@ import base64
 from pathlib import Path
 from gtts import gTTS
 
+# --- ŚCIEŻKI ---
 BASE_DIR = Path(__file__).parent
 WORDS_PATH = BASE_DIR / "words.json"
 PROGRESS_PATH = BASE_DIR / "progress.json"
 TTS_DIR = BASE_DIR / "tts_cache"
 TTS_DIR.mkdir(exist_ok=True)
 
+
+# --- FUNKCJE DANYCH ---
 
 def load_words():
     if not WORDS_PATH.exists():
@@ -33,21 +36,27 @@ def save_progress(progress_dict):
         json.dump(progress_dict, f, ensure_ascii=False, indent=2)
 
 
+# --- TTS ---
+
 def get_tts_audio_path(word: str) -> Path:
     h = hashlib.md5(word.encode("utf-8")).hexdigest()
     path = TTS_DIR / f"{h}.mp3"
+
     if not path.exists():
         tts = gTTS(text=word, lang="pl")
         tts.save(str(path))
+
     return path
 
 
 def autoplay_audio(word: str, audio_placeholder):
     audio_path = get_tts_audio_path(word)
+
     with audio_path.open("rb") as f:
         audio_bytes = f.read()
 
     b64 = base64.b64encode(audio_bytes).decode("utf-8")
+
     audio_placeholder.markdown(
         f"""
         <audio autoplay>
@@ -89,9 +98,12 @@ def play_word(word: str, overlay_placeholder, audio_placeholder):
         </div>
     </div>
     """
+
     overlay_placeholder.markdown(overlay_html, unsafe_allow_html=True)
     autoplay_audio(word, audio_placeholder)
 
+
+# --- LOGIKA SŁÓW DO GRY ---
 
 def unique_words_until_day(words_by_day: dict, day_num: str) -> list[str]:
     result = []
@@ -121,6 +133,8 @@ def reset_game_state():
             del st.session_state[key]
 
 
+# --- EKRAN TRENINGU ---
+
 def training_screen(day_num: str, words: list[str]):
     if len(words) != 5:
         st.error(f"Dzień {day_num} musi mieć dokładnie 5 słów, a ma {len(words)}.")
@@ -131,8 +145,8 @@ def training_screen(day_num: str, words: list[str]):
     overlay_placeholder = st.empty()
     audio_placeholder = st.empty()
 
-    for w in random.sample(words, len(words)):
-        play_word(w, overlay_placeholder, audio_placeholder)
+    for word in random.sample(words, len(words)):
+        play_word(word, overlay_placeholder, audio_placeholder)
         time.sleep(3.5)
         overlay_placeholder.empty()
         audio_placeholder.empty()
@@ -145,6 +159,8 @@ def training_screen(day_num: str, words: list[str]):
     st.session_state["view"] = "list"
     st.rerun()
 
+
+# --- EKRAN GRY ---
 
 def game_screen(day_num: str, words_by_day: dict):
     all_words = unique_words_until_day(words_by_day, day_num)
@@ -188,45 +204,62 @@ def game_screen(day_num: str, words_by_day: dict):
     st.markdown(
         """
         <style>
-        .game-backdrop {
+        .game-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.62);
-            z-index: 9990;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9000;
         }
 
         .main .block-container {
             position: relative;
             z-index: 9999;
-            padding-top: 18vh;
+            padding-top: 10vh !important;
+            max-width: 100vw !important;
         }
 
         div.stButton > button {
-            width: 100%;
-            min-height: 130px;
-            font-size: 56px !important;
+            width: 100% !important;
+            min-height: 150px !important;
+            background-color: white !important;
             color: red !important;
+            font-size: 80px !important;
             font-family: sans-serif !important;
-            border-radius: 18px !important;
+            border-radius: 1rem !important;
             border: none !important;
-            background: white !important;
-            box-shadow: 0 0 22px rgba(0,0,0,0.25) !important;
-            margin-bottom: 18px !important;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3) !important;
+            margin-bottom: 24px !important;
+            text-align: center !important;
         }
 
         div.stButton > button:hover {
-            background: #f8f8f8 !important;
+            background-color: white !important;
+            color: red !important;
+            border: none !important;
+        }
+
+        div.stButton > button:focus {
+            background-color: white !important;
+            color: red !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3) !important;
+        }
+
+        div.stButton > button:active {
+            background-color: white !important;
             color: red !important;
             border: none !important;
         }
         </style>
 
-        <div class="game-backdrop"></div>
+        <div class="game-overlay"></div>
         """,
         unsafe_allow_html=True,
     )
 
-    # środkowa kolumna o szerokości podobnej do karty słowa z treningu
     left, center, right = st.columns([1, 3, 1])
 
     with center:
@@ -238,17 +271,18 @@ def game_screen(day_num: str, words_by_day: dict):
                     f"""
                     <div style="
                         width: 100%;
-                        min-height: 130px;
+                        min-height: 150px;
+                        background-color: {bg};
+                        color: white;
+                        font-size: 80px;
+                        font-family: sans-serif;
+                        border-radius: 1rem;
+                        box-shadow: 0 0 20px rgba(0,0,0,0.3);
+                        margin-bottom: 24px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 56px;
-                        color: white;
-                        font-family: sans-serif;
-                        border-radius: 18px;
-                        background: {bg};
-                        box-shadow: 0 0 22px rgba(0,0,0,0.25);
-                        margin-bottom: 18px;
+                        text-align: center;
                     ">
                         {word}
                     </div>
@@ -275,6 +309,8 @@ def game_screen(day_num: str, words_by_day: dict):
             st.rerun()
 
 
+# --- EKRAN LISTY DNI ---
+
 def list_screen(words_by_day: dict):
     st.title("Nauka czytania")
 
@@ -298,6 +334,7 @@ def list_screen(words_by_day: dict):
         else:
             can_play = progress.get(str(dn_int - 1), 0) >= 3
 
+        can_game = count >= 3
         is_last = day_num == last_day
 
         with st.container():
@@ -339,6 +376,7 @@ def list_screen(words_by_day: dict):
                         help="Start treningu",
                         disabled=not can_play,
                     )
+
                 if start_clicked and can_play:
                     st.session_state["view"] = "training"
                     st.session_state["training_day"] = day_num
@@ -349,9 +387,11 @@ def list_screen(words_by_day: dict):
                     game_clicked = st.button(
                         "🎮",
                         key=f"game_start_{day_num}",
-                        help="Gra",
+                        help="Gra dostępna po zaliczeniu dnia",
+                        disabled=not can_game,
                     )
-                if game_clicked:
+
+                if game_clicked and can_game:
                     reset_game_state()
                     st.session_state["view"] = "game"
                     st.session_state["game_day"] = day_num
@@ -364,6 +404,7 @@ def list_screen(words_by_day: dict):
                         key=f"reset_{day_num}",
                         help="Reset licznika",
                     )
+
                 if reset_clicked:
                     progress[day_num] = 0
                     save_progress(progress)
@@ -375,6 +416,7 @@ def list_screen(words_by_day: dict):
                         key=f"manual_{day_num}",
                         help="Zalicz dzień ręcznie",
                     )
+
                 if manual_clicked:
                     progress[day_num] = max(progress.get(day_num, 0), 3)
                     save_progress(progress)
@@ -383,32 +425,40 @@ def list_screen(words_by_day: dict):
             st.markdown("")
 
 
+# --- GŁÓWNA FUNKCJA ---
+
 def main():
     st.set_page_config(page_title="Nauka czytania", layout="centered")
 
     if "view" not in st.session_state:
         st.session_state["view"] = "list"
+
     if "last_day" not in st.session_state:
         st.session_state["last_day"] = None
 
     words_by_day = load_words()
+
     if not words_by_day:
         st.error("Brak pliku words.json albo jest pusty.")
         st.stop()
 
     if st.session_state["view"] == "training":
         day = st.session_state.get("training_day")
+
         if day is None or day not in words_by_day:
             st.session_state["view"] = "list"
             st.rerun()
+
         training_screen(day, words_by_day[day])
 
     elif st.session_state["view"] == "game":
         day = st.session_state.get("game_day")
+
         if day is None or day not in words_by_day:
             reset_game_state()
             st.session_state["view"] = "list"
             st.rerun()
+
         game_screen(day, words_by_day)
 
     else:
