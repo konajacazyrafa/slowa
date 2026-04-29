@@ -188,31 +188,51 @@ def game_screen(day_num: str, words_by_day: dict):
     st.markdown(
         """
         <style>
+        .game-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.62);
+            z-index: 9990;
+        }
+
+        .main .block-container {
+            position: relative;
+            z-index: 9999;
+            padding-top: 18vh;
+        }
+
         div.stButton > button {
             width: 100%;
             min-height: 130px;
-            font-size: 42px !important;
+            font-size: 56px !important;
             color: red !important;
             font-family: sans-serif !important;
             border-radius: 18px !important;
-            border: 2px solid #eeeeee !important;
+            border: none !important;
             background: white !important;
-            box-shadow: 0 0 18px rgba(0,0,0,0.10) !important;
+            box-shadow: 0 0 22px rgba(0,0,0,0.25) !important;
+            margin-bottom: 18px !important;
+        }
+
+        div.stButton > button:hover {
+            background: #f8f8f8 !important;
+            color: red !important;
+            border: none !important;
         }
         </style>
+
+        <div class="game-backdrop"></div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    # środkowa kolumna o szerokości podobnej do karty słowa z treningu
+    left, center, right = st.columns([1, 3, 1])
 
-    cols = st.columns(3)
-
-    for i, word in enumerate(options):
-        with cols[i]:
+    with center:
+        for word in options:
             if feedback_word == word:
-                color = "#dff5e1" if feedback_correct else "#ffe1e1"
-                border = "#36a853" if feedback_correct else "#d93025"
+                bg = "#2e7d32" if feedback_correct else "#c62828"
 
                 st.markdown(
                     f"""
@@ -222,13 +242,13 @@ def game_screen(day_num: str, words_by_day: dict):
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 42px;
-                        color: red;
+                        font-size: 56px;
+                        color: white;
                         font-family: sans-serif;
                         border-radius: 18px;
-                        border: 3px solid {border};
-                        background: {color};
-                        box-shadow: 0 0 18px rgba(0,0,0,0.10);
+                        background: {bg};
+                        box-shadow: 0 0 22px rgba(0,0,0,0.25);
+                        margin-bottom: 18px;
                     ">
                         {word}
                     </div>
