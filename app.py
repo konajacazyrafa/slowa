@@ -7,7 +7,6 @@ import base64
 from pathlib import Path
 from gtts import gTTS
 
-# --- ŚCIEŻKI ---
 BASE_DIR = Path(__file__).parent
 WORDS_PATH = BASE_DIR / "words.json"
 PROGRESS_PATH = BASE_DIR / "progress.json"
@@ -15,10 +14,7 @@ TTS_DIR = BASE_DIR / "tts_cache"
 TTS_DIR.mkdir(exist_ok=True)
 
 
-# --- FUNKCJE DANYCH ---
-
 def load_words():
-    """Wczytuje words.json: { "1": [...], "2": [...], ... }"""
     if not WORDS_PATH.exists():
         return {}
     with WORDS_PATH.open("r", encoding="utf-8") as f:
@@ -37,10 +33,7 @@ def save_progress(progress_dict):
         json.dump(progress_dict, f, ensure_ascii=False, indent=2)
 
 
-# --- TTS ---
-
 def get_tts_audio_path(word: str) -> Path:
-    """Zwraca ścieżkę do mp3, generuje jeśli nie ma."""
     h = hashlib.md5(word.encode("utf-8")).hexdigest()
     path = TTS_DIR / f"{h}.mp3"
     if not path.exists():
@@ -49,8 +42,23 @@ def get_tts_audio_path(word: str) -> Path:
     return path
 
 
+def autoplay_audio(word: str, audio_placeholder):
+    audio_path = get_tts_audio_path(word)
+    with audio_path.open("rb") as f:
+        audio_bytes = f.read()
+
+    b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    audio_placeholder.markdown(
+        f"""
+        <audio autoplay>
+            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+        </audio>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def play_word(word: str, overlay_placeholder, audio_placeholder):
-    """Wyświetla słowo w pełnoekranowym overlayu + automatycznie odtwarza dźwięk."""
     overlay_html = f"""
     <div style="
         position: fixed;
@@ -82,24 +90,38 @@ def play_word(word: str, overlay_placeholder, audio_placeholder):
     </div>
     """
     overlay_placeholder.markdown(overlay_html, unsafe_allow_html=True)
-
-    audio_path = get_tts_audio_path(word)
-    with audio_path.open("rb") as f:
-        audio_bytes = f.read()
-    b64 = base64.b64encode(audio_bytes).decode("utf-8")
-
-    audio_html = f"""
-    <audio autoplay>
-        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-    </audio>
-    """
-    audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
+    autoplay_audio(word, audio_placeholder)
 
 
-# --- EKRAN TRENINGU ---
+def unique_words_until_day(words_by_day: dict, day_num: str) -> list[str]:
+    result = []
+    seen = set()
+    target_day = int(day_num)
+
+    for d in range(1, target_day + 1):
+        for word in words_by_day.get(str(d), []):
+            clean = word.strip()
+            if clean and clean not in seen:
+                seen.add(clean)
+                result.append(clean)
+
+    return result
+
+
+def reset_game_state():
+    for key in [
+        "game_day",
+        "game_target",
+        "game_options",
+        "game_feedback_word",
+        "game_feedback_correct",
+        "game_audio_pending",
+    ]:
+        if key in st.session_state:
+            del st.session_state[key]
+
 
 def training_screen(day_num: str, words: list[str]):
-    # Ten ekran pokazuje tylko popup ze słowami
     if len(words) != 5:
         st.error(f"Dzień {day_num} musi mieć dokładnie 5 słów, a ma {len(words)}.")
         st.session_state["view"] = "list"
@@ -109,16 +131,13 @@ def training_screen(day_num: str, words: list[str]):
     overlay_placeholder = st.empty()
     audio_placeholder = st.empty()
 
-    random_words = random.sample(words, len(words))
-
-    for w in random_words:
+    for w in random.sample(words, len(words)):
         play_word(w, overlay_placeholder, audio_placeholder)
         time.sleep(3.5)
         overlay_placeholder.empty()
         audio_placeholder.empty()
         time.sleep(2.0)
 
-    # po zakończeniu: licznik + powrót na listę
     progress = load_progress()
     progress[day_num] = progress.get(day_num, 0) + 1
     save_progress(progress)
@@ -127,7 +146,110 @@ def training_screen(day_num: str, words: list[str]):
     st.rerun()
 
 
-# --- EKRAN LISTY DNI ---
+def game_screen(day_num: str, words_by_day: dict):
+    all_words = unique_words_until_day(words_by_day, day_num)
+
+    if len(all_words) < 3:
+        st.error("Do gry potrzebne są co najmniej 3 różne słowa.")
+        if st.button("Wróć"):
+            reset_game_state()
+            st.session_state["view"] = "list"
+            st.rerun()
+        return
+
+    if st.session_state.get("game_day") != day_num:
+        target = random.choice(all_words)
+        others = [w for w in all_words if w != target]
+        options = random.sample(others, 2) + [target]
+        random.shuffle(options)
+
+        st.session_state["game_day"] = day_num
+        st.session_state["game_target"] = target
+        st.session_state["game_options"] = options
+        st.session_state["game_audio_pending"] = True
+        st.session_state["game_feedback_word"] = None
+        st.session_state["game_feedback_correct"] = None
+
+    target = st.session_state["game_target"]
+    options = st.session_state["game_options"]
+    feedback_word = st.session_state.get("game_feedback_word")
+    feedback_correct = st.session_state.get("game_feedback_correct")
+
+    audio_placeholder = st.empty()
+
+    if st.session_state.get("game_audio_pending"):
+        autoplay_audio(target, audio_placeholder)
+        st.session_state["game_audio_pending"] = False
+
+    st.markdown(
+        """
+        <style>
+        div.stButton > button {
+            width: 100%;
+            min-height: 130px;
+            font-size: 42px !important;
+            color: red !important;
+            font-family: sans-serif !important;
+            border-radius: 18px !important;
+            border: 2px solid #eeeeee !important;
+            background: white !important;
+            box-shadow: 0 0 18px rgba(0,0,0,0.10) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    cols = st.columns(3)
+
+    for i, word in enumerate(options):
+        with cols[i]:
+            if feedback_word == word:
+                color = "#dff5e1" if feedback_correct else "#ffe1e1"
+                border = "#36a853" if feedback_correct else "#d93025"
+
+                st.markdown(
+                    f"""
+                    <div style="
+                        width: 100%;
+                        min-height: 130px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 42px;
+                        color: red;
+                        font-family: sans-serif;
+                        border-radius: 18px;
+                        border: 3px solid {border};
+                        background: {color};
+                        box-shadow: 0 0 18px rgba(0,0,0,0.10);
+                    ">
+                        {word}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                clicked = st.button(word, key=f"game_{day_num}_{word}")
+                if clicked:
+                    st.session_state["game_feedback_word"] = word
+                    st.session_state["game_feedback_correct"] = (word == target)
+                    st.rerun()
+
+    if feedback_word is not None:
+        time.sleep(1)
+
+        if feedback_correct:
+            reset_game_state()
+            st.session_state["view"] = "list"
+            st.rerun()
+        else:
+            st.session_state["game_feedback_word"] = None
+            st.session_state["game_feedback_correct"] = None
+            st.rerun()
+
 
 def list_screen(words_by_day: dict):
     st.title("Nauka czytania")
@@ -135,7 +257,7 @@ def list_screen(words_by_day: dict):
     st.markdown(
         "Uruchom trening z wybranego dnia. "
         "Ostatni uruchamiany dzień jest podświetlony. "
-        "Aby uruchomić nowy dzień, zalicz 3 powtórzenia dnia poprzedniego. "
+        "Aby uruchomić nowy dzień, zalicz 3 powtórzenia dnia poprzedniego."
     )
 
     progress = load_progress()
@@ -147,20 +269,16 @@ def list_screen(words_by_day: dict):
         count = progress.get(day_num, 0)
         status = "✅ zaliczony" if count >= 3 else "⏳ w trakcie"
 
-        # blokada: dzień N dostępny dopiero, gdy dzień N-1 zaliczony
         if dn_int == 1:
             can_play = True
         else:
-            prev_key = str(dn_int - 1)
-            can_play = progress.get(prev_key, 0) >= 3
+            can_play = progress.get(str(dn_int - 1), 0) >= 3
 
-        # czy to ostatnio uruchamiany dzień
         is_last = (day_num == last_day)
 
         with st.container():
-            col1, col2, col3 = st.columns([3, 4, 4])
+            col1, col2, col3 = st.columns([3, 4, 5])
 
-            # lewa kolumna – cały blok w niebieskim tle gdy is_last
             with col1:
                 if is_last:
                     st.markdown(
@@ -184,15 +302,12 @@ def list_screen(words_by_day: dict):
                         f"Status: {status}"
                     )
 
-            # środkowa kolumna – słowa
             with col2:
                 st.write(", ".join(words))
 
-            # prawa kolumna – trzy małe przyciski (ikonki) w jednej linii
             with col3:
-                bcol1, bcol2, bcol3 = st.columns(3)
+                bcol1, bcol2, bcol3, bcol4 = st.columns(4)
 
-                # START ▶️
                 with bcol1:
                     start_clicked = st.button(
                         "▶️",
@@ -206,8 +321,20 @@ def list_screen(words_by_day: dict):
                     st.session_state["last_day"] = day_num
                     st.rerun()
 
-                # RESET 🔄
                 with bcol2:
+                    game_clicked = st.button(
+                        "🎮",
+                        key=f"game_start_{day_num}",
+                        help="Gra",
+                    )
+                if game_clicked:
+                    reset_game_state()
+                    st.session_state["view"] = "game"
+                    st.session_state["game_day"] = day_num
+                    st.session_state["last_day"] = day_num
+                    st.rerun()
+
+                with bcol3:
                     reset_clicked = st.button(
                         "🔄",
                         key=f"reset_{day_num}",
@@ -218,8 +345,7 @@ def list_screen(words_by_day: dict):
                     save_progress(progress)
                     st.rerun()
 
-                # RĘCZNE ZALICZENIE ✔️
-                with bcol3:
+                with bcol4:
                     manual_clicked = st.button(
                         "✔️",
                         key=f"manual_{day_num}",
@@ -230,10 +356,8 @@ def list_screen(words_by_day: dict):
                     save_progress(progress)
                     st.rerun()
 
-            st.markdown("")  # mały odstęp między dniami
+            st.markdown("")
 
-
-# --- GŁÓWNA FUNKCJA ---
 
 def main():
     st.set_page_config(page_title="Nauka czytania", layout="centered")
@@ -254,6 +378,15 @@ def main():
             st.session_state["view"] = "list"
             st.rerun()
         training_screen(day, words_by_day[day])
+
+    elif st.session_state["view"] == "game":
+        day = st.session_state.get("game_day")
+        if day is None or day not in words_by_day:
+            reset_game_state()
+            st.session_state["view"] = "list"
+            st.rerun()
+        game_screen(day, words_by_day)
+
     else:
         list_screen(words_by_day)
 
