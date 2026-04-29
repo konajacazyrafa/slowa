@@ -4,9 +4,7 @@ import random
 import time
 import hashlib
 import base64
-import html
 from pathlib import Path
-from urllib.parse import quote
 from gtts import gTTS
 
 BASE_DIR = Path(__file__).parent
@@ -65,8 +63,6 @@ def autoplay_audio(word: str, audio_placeholder):
 
 
 def play_word(word: str, overlay_placeholder, audio_placeholder):
-    safe_word = html.escape(word)
-
     overlay_html = f"""
     <div style="
         position: fixed;
@@ -92,7 +88,7 @@ def play_word(word: str, overlay_placeholder, audio_placeholder):
                 color: red;
                 font-family: sans-serif;
             ">
-                {safe_word}
+                {word}
             </div>
         </div>
     </div>
@@ -155,88 +151,30 @@ def training_screen(day_num: str, words: list[str]):
     st.rerun()
 
 
-def render_game_cards(options, feedback_word, feedback_correct):
-    cards_html = """
-    <div style="
-        position: fixed;
-        top: 0; left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.6);
-        z-index: 9998;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    ">
+def game_card(word: str, color: str):
+    st.markdown(
+        f"""
         <div style="
-            width: 60%;
-            min-width: 60%;
+            width: 100%;
+            min-height: 150px;
+            background-color: {color};
+            color: white;
+            font-size: 80px;
+            font-family: sans-serif;
+            border-radius: 1rem;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            margin-bottom: 24px;
             display: flex;
-            flex-direction: column;
-            gap: 24px;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-sizing: border-box;
         ">
-    """
-
-    for word in options:
-        safe_word = html.escape(word)
-
-        if feedback_word == word:
-            bg = "#2e7d32" if feedback_correct else "#c62828"
-            color = "white"
-            card_html = f"""
-            <div style="
-                background: {bg};
-                padding: 2rem 3rem;
-                border-radius: 1rem;
-                box-shadow: 0 0 20px rgba(0,0,0,0.3);
-                min-height: 130px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                font-size: 80px;
-                color: {color};
-                font-family: sans-serif;
-                box-sizing: border-box;
-            ">
-                {safe_word}
-            </div>
-            """
-        else:
-            href = f"?choice={quote(word)}"
-            card_html = f"""
-            <a href="{href}" target="_self" style="
-                text-decoration: none;
-                display: block;
-            ">
-                <div style="
-                    background: white;
-                    padding: 2rem 3rem;
-                    border-radius: 1rem;
-                    box-shadow: 0 0 20px rgba(0,0,0,0.3);
-                    min-height: 130px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    text-align: center;
-                    font-size: 80px;
-                    color: red;
-                    font-family: sans-serif;
-                    box-sizing: border-box;
-                ">
-                    {safe_word}
-                </div>
-            </a>
-            """
-
-        cards_html += card_html
-
-    cards_html += """
+            {word}
         </div>
-    </div>
-    """
-
-    st.markdown(cards_html, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def game_screen(day_num: str, words_by_day: dict):
@@ -269,14 +207,6 @@ def game_screen(day_num: str, words_by_day: dict):
 
     target = st.session_state["game_target"]
     options = st.session_state["game_options"]
-
-    choice = st.query_params.get("choice")
-    if choice is not None:
-        st.session_state["game_feedback_word"] = choice
-        st.session_state["game_feedback_correct"] = choice == target
-        st.query_params.clear()
-        st.rerun()
-
     feedback_word = st.session_state.get("game_feedback_word")
     feedback_correct = st.session_state.get("game_feedback_correct")
 
@@ -286,7 +216,95 @@ def game_screen(day_num: str, words_by_day: dict):
         autoplay_audio(target, audio_placeholder)
         st.session_state["game_audio_pending"] = False
 
-    render_game_cards(options, feedback_word, feedback_correct)
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        header {
+            display: none !important;
+        }
+
+        .block-container {
+            padding-top: 14vh !important;
+            max-width: 100vw !important;
+        }
+
+        div[data-testid="stButton"] > button {
+            width: 100% !important;
+            min-height: 150px !important;
+            background-color: white !important;
+            color: red !important;
+            border: none !important;
+            border-radius: 1rem !important;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3) !important;
+            margin-bottom: 24px !important;
+            font-family: sans-serif !important;
+        }
+
+        div[data-testid="stButton"] > button p {
+            font-size: 80px !important;
+            color: red !important;
+            font-family: sans-serif !important;
+        }
+
+        div[data-testid="stButton"] > button:hover {
+            background-color: white !important;
+            color: red !important;
+            border: none !important;
+        }
+
+        div[data-testid="stButton"] > button:hover p {
+            color: red !important;
+        }
+
+        div[data-testid="stButton"] > button:focus {
+            background-color: white !important;
+            color: red !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3) !important;
+        }
+
+        div[data-testid="stButton"] > button:focus p {
+            color: red !important;
+        }
+
+        div[data-testid="stButton"] > button:active {
+            background-color: white !important;
+            color: red !important;
+            border: none !important;
+        }
+
+        div[data-testid="stButton"] > button:active p {
+            color: red !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    left, center, right = st.columns([1, 3, 1])
+
+    with center:
+        for word in options:
+            if feedback_word == word:
+                if feedback_correct:
+                    game_card(word, "#2e7d32")
+                else:
+                    game_card(word, "#c62828")
+            else:
+                clicked = st.button(
+                    word,
+                    key=f"game_card_{day_num}_{word}",
+                    use_container_width=True,
+                )
+                if clicked:
+                    st.session_state["game_feedback_word"] = word
+                    st.session_state["game_feedback_correct"] = word == target
+                    st.rerun()
 
     if feedback_word is not None:
         time.sleep(1)
