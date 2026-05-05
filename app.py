@@ -180,8 +180,11 @@ def game_card(word: str, color: str):
     )
 
 
-def game_screen(day_num: str, words_by_day: dict):
-    all_words = unique_words_until_day(words_by_day, day_num)
+def game_screen(day_num: str | None, words_by_day: dict):
+    if "game_words" in st.session_state:
+        all_words = st.session_state["game_words"]
+    else:
+        all_words = unique_words_until_day(words_by_day, day_num)
 
     if len(all_words) < 3:
         st.error("Do gry potrzebne są co najmniej 3 różne słowa.")
