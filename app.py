@@ -508,17 +508,47 @@ def single_game_screen(day_num: str, words_by_day: dict):
 
     if "single_game_word" not in st.session_state:
         st.session_state["single_game_word"] = random.choice(all_words)
-        st.session_state["single_game_audio_pending"] = True
 
     word = st.session_state["single_game_word"]
 
-    audio_placeholder = st.empty()
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: rgba(0, 0, 0, 0.6);
+        }
 
-    if st.session_state.get("single_game_audio_pending"):
-        autoplay_audio(word, audio_placeholder)
-        st.session_state["single_game_audio_pending"] = False
+        header {
+            display: none !important;
+        }
 
-    apply_game_styles()
+        .block-container {
+            padding-top: 14vh !important;
+            max-width: 100vw !important;
+        }
+
+        div[data-testid="stButton"] > button {
+            width: 100% !important;
+            min-height: 150px !important;
+            background-color: white !important;
+            color: red !important;
+            border: none !important;
+            border-radius: 1rem !important;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3) !important;
+            margin-bottom: 24px !important;
+            font-family: sans-serif !important;
+        }
+
+        div[data-testid="stButton"] > button p {
+            font-size: 80px !important;
+            color: red !important;
+            font-family: sans-serif !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     left, center, right = st.columns([1, 3, 1])
 
     with center:
