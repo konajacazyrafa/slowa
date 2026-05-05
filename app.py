@@ -121,6 +121,9 @@ def reset_game_state():
         "game_feedback_word",
         "game_feedback_correct",
         "game_audio_pending",
+        "game_words",
+        "single_game_word",
+        "single_game_audio_pending",
     ]:
         if key in st.session_state:
             del st.session_state[key]
@@ -329,6 +332,51 @@ def list_screen(words_by_day: dict):
     )
 
     progress = load_progress()
+
+
+    def unique_words_from_completed(words_by_day, progress):
+        result = []
+        seen = set()
+
+        for day, words in sorted(words_by_day.items(), key=lambda x: int(x[0])):
+            if progress.get(day, 0) >= 3:
+                for w in words:
+                    if w not in seen:
+                        seen.add(w)
+                        result.append(w)
+        return result
+
+
+    completed_words = unique_words_from_completed(words_by_day, progress)
+    
+    top_col1, top_col2 = st.columns(2)
+
+    with top_col1:
+        if st.button(
+            "🎮 Gra (zaliczone dni)",
+            disabled=len(completed_words) < 3,
+            use_container_width=True
+        ):
+            reset_game_state()
+            st.session_state["view"] = "game"
+            st.session_state["game_words"] = completed_words
+            st.session_state["game_day"] = None
+            st.rerun()
+    
+    with top_col2:
+        if st.button(
+            "🎯 1 słowo (zaliczone dni)",
+            disabled=len(completed_words) < 1,
+            use_container_width=True
+        ):
+            reset_game_state()
+            st.session_state["view"] = "single_game"
+            st.session_state["game_words"] = completed_words
+            st.session_state["game_day"] = None
+            st.rerun()
+
+    st.markdown("---")
+    
     days_sorted = sorted(words_by_day.items(), key=lambda x: int(x[0]))
     last_day = st.session_state.get("last_day")
 
@@ -375,7 +423,7 @@ def list_screen(words_by_day: dict):
                 st.write(", ".join(words))
 
             with col3:
-                bcol1, bcol2, bcol3, bcol4 = st.columns(4)
+                bcol1, bcol2, bcol3, bcol4, bcol5 = st.columns(5)
 
                 with bcol1:
                     start_clicked = st.button(
@@ -407,6 +455,21 @@ def list_screen(words_by_day: dict):
                     st.rerun()
 
                 with bcol3:
+                    single_clicked = st.button(
+                        "🎯",
+                        key=f"single_{day_num}",
+                        help="Gra jedno słowo",
+                        disabled=not can_game,
+                    )
+            
+                if single_clicked and can_game:
+                    reset_game_state()
+                    st.session_state["view"] = "single_game"
+                    st.session_state["game_day"] = day_num
+                    st.session_state["last_day"] = day_num
+                    st.rerun()
+                
+                with bcol4:
                     reset_clicked = st.button(
                         "🔄",
                         key=f"reset_{day_num}",
@@ -418,7 +481,7 @@ def list_screen(words_by_day: dict):
                     save_progress(progress)
                     st.rerun()
 
-                with bcol4:
+                with bcol5:
                     manual_clicked = st.button(
                         "✔️",
                         key=f"manual_{day_num}",
@@ -432,6 +495,43 @@ def list_screen(words_by_day: dict):
 
             st.markdown("")
 
+
+def single_game_screen(day_num: str, words_by_day: dict):
+    if "game_words" in st.session_state:
+        all_words = st.session_state["game_words"]
+    else:
+        all_words = unique_words_until_day(words_by_day, day_num)
+
+    if len(all_words) < 1:
+        st.error("Brak słów do gry.")
+        return
+
+    if "single_game_word" not in st.session_state:
+        st.session_state["single_game_word"] = random.choice(all_words)
+        st.session_state["single_game_audio_pending"] = True
+
+    word = st.session_state["single_game_word"]
+
+    audio_placeholder = st.empty()
+
+    if st.session_state.get("single_game_audio_pending"):
+        autoplay_audio(word, audio_placeholder)
+        st.session_state["single_game_audio_pending"] = False
+
+    # używamy TEGO SAMEGO stylu co game_screen (nic nie zmieniamy)
+    left, center, right = st.columns([1, 3, 1])
+
+    with center:
+        clicked = st.button(
+            word,
+            key=f"single_game_card_{word}",
+            use_container_width=True,
+        )
+
+    if clicked:
+        reset_game_state()
+        st.session_state["view"] = "list"
+        st.rerun()
 
 def main():
     st.set_page_config(page_title="Nauka czytania", layout="centered")
@@ -469,6 +569,17 @@ def main():
 
     else:
         list_screen(words_by_day)
+
+    elif st.session_state["view"] == "single_game":
+        day = st.session_state.get("game_day")
+    
+        if "game_words" not in st.session_state:
+            if day is None or day not in words_by_day:
+                reset_game_state()
+                st.session_state["view"] = "list"    
+                st.rerun()
+
+        single_game_screen(day, words_by_day)
 
 
 if __name__ == "__main__":
