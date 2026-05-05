@@ -518,7 +518,7 @@ def single_game_screen(day_num: str, words_by_day: dict):
         autoplay_audio(word, audio_placeholder)
         st.session_state["single_game_audio_pending"] = False
 
-    # używamy TEGO SAMEGO stylu co game_screen (nic nie zmieniamy)
+    apply_game_styles()
     left, center, right = st.columns([1, 3, 1])
 
     with center:
@@ -560,26 +560,27 @@ def main():
     elif st.session_state["view"] == "game":
         day = st.session_state.get("game_day")
 
-        if day is None or day not in words_by_day:
-            reset_game_state()
-            st.session_state["view"] = "list"
-            st.rerun()
-
-        game_screen(day, words_by_day)
-
-    else:
-        list_screen(words_by_day)
-
-    elif st.session_state["view"] == "single_game":
-        day = st.session_state.get("game_day")
-    
         if "game_words" not in st.session_state:
             if day is None or day not in words_by_day:
                 reset_game_state()
-                st.session_state["view"] = "list"    
+                st.session_state["view"] = "list"
+                st.rerun()
+
+        game_screen(day, words_by_day)
+
+    elif st.session_state["view"] == "single_game":
+        day = st.session_state.get("game_day")
+
+        if "game_words" not in st.session_state:
+            if day is None or day not in words_by_day:
+                reset_game_state()
+                st.session_state["view"] = "list"
                 st.rerun()
 
         single_game_screen(day, words_by_day)
+
+    else:
+        list_screen(words_by_day)
 
 
 if __name__ == "__main__":
